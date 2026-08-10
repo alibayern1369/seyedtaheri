@@ -18,8 +18,8 @@ export function HeroSection({ content }: { content: ResumeContent }) {
         <div className="absolute right-[10%] bottom-[20%] h-64 w-64 rounded-full bg-[var(--hero-orb-2)] blur-3xl" />
       </div>
 
-      <div className="container-page relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-        <Reveal>
+      <div className="container-page relative grid min-w-0 items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+        <Reveal className="min-w-0">
           <p className="section-kicker">Portfolio</p>
           <h1 className="max-w-3xl text-[clamp(2.6rem,7vw,4.6rem)] font-semibold leading-[1.02] tracking-[-0.045em]">
             {profile.name}
@@ -53,16 +53,16 @@ export function HeroSection({ content }: { content: ResumeContent }) {
 
         <Reveal
           delay={0.12}
-          className="w-full max-w-[22rem] justify-self-center lg:justify-self-end"
+          className="mx-auto w-full min-w-0 max-w-[min(100%,18rem)] justify-self-center sm:max-w-[20rem] lg:max-w-[22rem] lg:justify-self-end"
         >
-          <div className="glass-strong relative aspect-[4/5] w-full overflow-hidden rounded-[2rem] p-3">
-            <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] bg-[var(--bg-elevated)]">
+          <div className="glass-strong relative aspect-[4/5] w-full max-w-full overflow-hidden rounded-[clamp(1.15rem,4vw,2rem)] p-[clamp(0.45rem,1.6vw,0.75rem)]">
+            <div className="relative h-full w-full overflow-hidden rounded-[clamp(0.85rem,3vw,1.5rem)] bg-[var(--bg-elevated)]">
               {profile.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profile.photoUrl}
                   alt={profile.name}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full max-w-full object-cover"
                   fetchPriority="high"
                   decoding="async"
                   width={704}
