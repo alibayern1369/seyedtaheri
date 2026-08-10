@@ -45,18 +45,6 @@ export async function generateMetadata(): Promise<Metadata> {
       description: seo.description,
       images: seo.ogImage ? [seo.ogImage] : undefined,
     },
-    icons: seo.faviconUrl
-      ? {
-          icon: [{ url: seo.faviconUrl }],
-          shortcut: seo.faviconUrl,
-          apple: seo.logoUrl || seo.faviconUrl,
-        }
-      : seo.logoUrl
-        ? {
-            icon: [{ url: seo.logoUrl }],
-            apple: seo.logoUrl,
-          }
-        : undefined,
     verification: seo.googleSiteVerification
       ? { google: seo.googleSiteVerification }
       : undefined,

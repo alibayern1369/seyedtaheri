@@ -1,6 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { Redis } from "@upstash/redis";
+import { mediaPublicUrl, type MediaKind } from "@/lib/media-url";
 import {
   RESUME_FAVICON_KEY,
   RESUME_LOGO_KEY,
@@ -8,7 +9,12 @@ import {
   RESUME_PHOTO_KEY,
 } from "@/types/resume";
 
-export type MediaKind = "photo" | "og" | "logo" | "favicon";
+export type { MediaKind } from "@/lib/media-url";
+export {
+  isMediaKind,
+  isManagedMediaPath,
+  mediaPublicUrl,
+} from "@/lib/media-url";
 
 export type StoredMedia = {
   contentType: string;
@@ -40,15 +46,6 @@ const CONTENT_FIELDS: Record<
   logo: "logoUrl",
   favicon: "faviconUrl",
 };
-
-export function isMediaKind(value: unknown): value is MediaKind {
-  return (
-    value === "photo" ||
-    value === "og" ||
-    value === "logo" ||
-    value === "favicon"
-  );
-}
 
 export function mediaContentField(kind: MediaKind) {
   return CONTENT_FIELDS[kind];
@@ -85,19 +82,37 @@ export async function saveMedia(
   await writeFile(LOCAL_PATHS[kind], JSON.stringify(media), "utf8");
 }
 
+function normalizeStoredMedia(raw: unknown): StoredMedia | null {
+  let value: unknown = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.base64 !== "string" ||
+    !record.base64 ||
+    typeof record.contentType !== "string" ||
+    !record.contentType
+  ) {
+    return null;
+  }
+  return { base64: record.base64, contentType: record.contentType };
+}
+
 export async function getMedia(kind: MediaKind): Promise<StoredMedia | null> {
   try {
     const redis = getRedis();
     if (redis) {
-      const stored = await redis.get<StoredMedia>(MEDIA_KEYS[kind]);
-      if (stored?.base64 && stored?.contentType) return stored;
-      return null;
+      return normalizeStoredMedia(await redis.get(MEDIA_KEYS[kind]));
     }
 
     const raw = await readFile(LOCAL_PATHS[kind], "utf8");
-    const stored = JSON.parse(raw) as StoredMedia;
-    if (stored?.base64 && stored?.contentType) return stored;
-    return null;
+    return normalizeStoredMedia(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -121,10 +136,6 @@ export async function deleteMedia(kind: MediaKind): Promise<void> {
   } catch {
     // ignore missing file
   }
-}
-
-export function mediaPublicUrl(kind: MediaKind, version = Date.now()) {
-  return `/api/media/${kind}?v=${version}`;
 }
 
 /** @deprecated Prefer getMedia("photo") */

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { Redis } from "@upstash/redis";
 import { defaultResumeContent } from "@/data/default-resume";
-import { getMedia, mediaPublicUrl, type MediaKind } from "@/lib/media";
+import { getMedia, isManagedMediaPath, mediaPublicUrl, type MediaKind } from "@/lib/media";
 import { RESUME_CONTENT_KEY, type ResumeContent } from "@/types/resume";
 
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
@@ -33,30 +33,28 @@ async function writeLocalContent(content: ResumeContent): Promise<void> {
   await writeFile(LOCAL_CONTENT_PATH, JSON.stringify(content), "utf8");
 }
 
-function isManagedMediaUrl(url: string, kind: MediaKind) {
-  if (kind === "photo") {
-    return (
-      url.startsWith("/api/media/photo") ||
-      url.startsWith("/api/photo") ||
-      url.startsWith("data:")
-    );
-  }
-  return url.startsWith(`/api/media/${kind}`) || url.startsWith("data:");
-}
-
 async function resolveMediaUrl(
   current: string,
   kind: MediaKind,
 ): Promise<string> {
   const stored = await getMedia(kind);
-  if (!stored) return current;
-  if (isManagedMediaUrl(current, kind) && !current.startsWith("data:")) {
-    // Normalize legacy photo path
-    if (kind === "photo" && current.startsWith("/api/photo")) {
-      return mediaPublicUrl("photo");
-    }
+  if (!stored) {
+    // Drop dangling managed URLs when the blob is missing.
+    if (isManagedMediaPath(current, kind)) return "";
     return current;
   }
+
+  // Keep a stable /media URL (preserve cache-busting version when already set).
+  if (current.startsWith(`/media/${kind}`)) {
+    return current;
+  }
+
+  // Rewrite legacy /api paths to the public /media route.
+  if (isManagedMediaPath(current, kind) || !current) {
+    return mediaPublicUrl(kind);
+  }
+
+  // External URL in content, but we also have a stored blob — prefer stored.
   return mediaPublicUrl(kind);
 }
 
@@ -101,7 +99,11 @@ export async function getResumeContent(): Promise<ResumeContent> {
     }
     return withStoredMedia(mergeWithDefaults(local));
   } catch {
-    return defaultResumeContent;
+    try {
+      return await withStoredMedia(defaultResumeContent);
+    } catch {
+      return defaultResumeContent;
+    }
   }
 }
 
