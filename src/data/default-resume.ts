@@ -427,4 +427,11 @@ export const defaultResumeContent: ResumeContent = {
     faviconUrl: "",
     googleSiteVerification: "",
   },
+  recaptcha: {
+    protectSite: false,
+    protectLogin: false,
+    siteKey: "",
+    secretKey: "",
+    minScore: 0.5,
+  },
 };

@@ -57,7 +57,8 @@ type Tab =
   | "contact"
   | "social"
   | "sections"
-  | "seo";
+  | "seo"
+  | "security";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "profile", label: "Profile" },
@@ -72,6 +73,7 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "social", label: "Social" },
   { id: "sections", label: "Sections" },
   { id: "seo", label: "SEO" },
+  { id: "security", label: "Security" },
 ];
 
 export function AdminEditor({
@@ -1019,9 +1021,144 @@ export function AdminEditor({
               </GlassCard>
             </div>
           )}
+
+          {tab === "security" && (
+            <div className="space-y-4">
+              <GlassCard className="space-y-4 p-5 sm:p-6">
+                <h3 className="text-sm font-semibold tracking-wide text-[var(--muted)] uppercase">
+                  Google reCAPTCHA v3
+                </h3>
+                <p className="text-sm text-[var(--muted)]">
+                  Create keys at{" "}
+                  <a
+                    className="underline underline-offset-2"
+                    href="https://www.google.com/recaptcha/admin"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Google reCAPTCHA Admin
+                  </a>{" "}
+                  (choose reCAPTCHA v3). Protection stays off until both the
+                  site key and secret key are saved.
+                </p>
+
+                <ToggleRow
+                  label="Protect admin login"
+                  description="Require a reCAPTCHA v3 check when signing in to /admin."
+                  checked={content.recaptcha.protectLogin}
+                  onChange={(checked) =>
+                    setContent((p) => ({
+                      ...p,
+                      recaptcha: { ...p.recaptcha, protectLogin: checked },
+                    }))
+                  }
+                />
+                <ToggleRow
+                  label="Protect entire site"
+                  description="Visitors must pass a quiet reCAPTCHA v3 check before the site loads."
+                  checked={content.recaptcha.protectSite}
+                  onChange={(checked) =>
+                    setContent((p) => ({
+                      ...p,
+                      recaptcha: { ...p.recaptcha, protectSite: checked },
+                    }))
+                  }
+                />
+
+                <Field
+                  label="Site key"
+                  value={content.recaptcha.siteKey}
+                  onChange={(v) =>
+                    setContent((p) => ({
+                      ...p,
+                      recaptcha: { ...p.recaptcha, siteKey: v.trim() },
+                    }))
+                  }
+                />
+                <label className="block text-sm">
+                  <span className="mb-1.5 block text-[var(--muted)]">
+                    Secret key
+                  </span>
+                  <input
+                    className="input-field"
+                    type="password"
+                    autoComplete="off"
+                    value={content.recaptcha.secretKey}
+                    onChange={(e) =>
+                      setContent((p) => ({
+                        ...p,
+                        recaptcha: {
+                          ...p.recaptcha,
+                          secretKey: e.target.value.trim(),
+                        },
+                      }))
+                    }
+                  />
+                  <span className="mt-1.5 block text-xs text-[var(--faint)]">
+                    Stored server-side only. Never shown on the public site.
+                  </span>
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1.5 block text-[var(--muted)]">
+                    Minimum score ({content.recaptcha.minScore.toFixed(1)})
+                  </span>
+                  <input
+                    className="w-full accent-[var(--accent)]"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={content.recaptcha.minScore}
+                    onChange={(e) =>
+                      setContent((p) => ({
+                        ...p,
+                        recaptcha: {
+                          ...p.recaptcha,
+                          minScore: Number(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                  <span className="mt-1.5 block text-xs text-[var(--faint)]">
+                    0.0 is very permissive; 1.0 is strict. Google often suggests
+                    0.5.
+                  </span>
+                </label>
+              </GlassCard>
+            </div>
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="glass flex cursor-pointer items-start gap-3 rounded-2xl p-3">
+      <input
+        type="checkbox"
+        className="mt-1 h-4 w-4 accent-[var(--accent)]"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>
+        <span className="block text-sm font-medium">{label}</span>
+        <span className="mt-0.5 block text-xs text-[var(--muted)]">
+          {description}
+        </span>
+      </span>
+    </label>
   );
 }
 

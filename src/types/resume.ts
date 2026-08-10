@@ -128,6 +128,19 @@ export interface ResumeContent {
     faviconUrl: string;
     googleSiteVerification: string;
   };
+  recaptcha: RecaptchaSettings;
+}
+
+export interface RecaptchaSettings {
+  /** Protect the public site with a reCAPTCHA v3 challenge gate. */
+  protectSite: boolean;
+  /** Require reCAPTCHA v3 on the admin login form. */
+  protectLogin: boolean;
+  siteKey: string;
+  /** Server-only. Never returned on public API responses. */
+  secretKey: string;
+  /** Minimum score (0.0–1.0). Google recommends ~0.5. */
+  minScore: number;
 }
 
 export const RESUME_CONTENT_KEY = "resume:content";

@@ -3,7 +3,11 @@ import path from "path";
 import { Redis } from "@upstash/redis";
 import { defaultResumeContent } from "@/data/default-resume";
 import { getMedia, isManagedMediaPath, mediaPublicUrl, type MediaKind } from "@/lib/media";
-import { RESUME_CONTENT_KEY, type ResumeContent } from "@/types/resume";
+import {
+  RESUME_CONTENT_KEY,
+  type RecaptchaSettings,
+  type ResumeContent,
+} from "@/types/resume";
 
 const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
 const LOCAL_CONTENT_PATH = path.join(LOCAL_DATA_DIR, "content.json");
@@ -189,5 +193,43 @@ function mergeWithDefaults(stored: ResumeContent): ResumeContent {
     socialLinks: stored.socialLinks ?? defaultResumeContent.socialLinks,
     sections: stored.sections ?? defaultResumeContent.sections,
     seo: { ...defaultResumeContent.seo, ...stored.seo },
+    recaptcha: mergeRecaptcha(stored.recaptcha),
+  };
+}
+
+function mergeRecaptcha(
+  stored: Partial<RecaptchaSettings> | undefined,
+): RecaptchaSettings {
+  const base = defaultResumeContent.recaptcha;
+  const minScore = Number(stored?.minScore);
+  return {
+    protectLogin: Boolean(stored?.protectLogin ?? base.protectLogin),
+    protectSite: Boolean(stored?.protectSite ?? base.protectSite),
+    siteKey: stored?.siteKey ?? base.siteKey,
+    secretKey: stored?.secretKey ?? base.secretKey,
+    minScore:
+      Number.isFinite(minScore) && minScore >= 0 && minScore <= 1
+        ? minScore
+        : base.minScore,
+  };
+}
+
+/** Strip the reCAPTCHA secret before sending content to anonymous clients. */
+export function withoutRecaptchaSecret(content: ResumeContent): ResumeContent {
+  if (!content.recaptcha?.secretKey) return content;
+  return {
+    ...content,
+    recaptcha: { ...content.recaptcha, secretKey: "" },
+  };
+}
+
+export function getRecaptchaPublicConfig(content: ResumeContent) {
+  const { recaptcha } = content;
+  const configured = Boolean(recaptcha.siteKey && recaptcha.secretKey);
+  return {
+    protectLogin: configured && recaptcha.protectLogin,
+    protectSite: configured && recaptcha.protectSite,
+    siteKey: configured ? recaptcha.siteKey : "",
+    minScore: recaptcha.minScore,
   };
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { SiteRecaptchaGate } from "@/components/security/site-recaptcha-gate";
 import { getResumeContent } from "@/lib/content";
 import "./globals.css";
 
@@ -65,7 +66,9 @@ export default function RootLayout({
       <body
         className={`${display.variable} ${mono.variable} min-h-full antialiased`}
       >
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <SiteRecaptchaGate>{children}</SiteRecaptchaGate>
+        </ThemeProvider>
       </body>
     </html>
   );
