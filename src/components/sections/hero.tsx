@@ -51,21 +51,24 @@ export function HeroSection({ content }: { content: ResumeContent }) {
           <SocialIcons className="mt-8" links={content.socialLinks} />
         </Reveal>
 
-        <Reveal delay={0.12} className="justify-self-center lg:justify-self-end">
-          <div className="glass-strong relative aspect-[4/5] w-[min(100%,22rem)] overflow-hidden rounded-[2rem] p-3">
+        <Reveal
+          delay={0.12}
+          className="w-full max-w-[22rem] justify-self-center lg:justify-self-end"
+        >
+          <div className="glass-strong relative aspect-[4/5] w-full overflow-hidden rounded-[2rem] p-3">
             <div className="relative h-full w-full overflow-hidden rounded-[1.5rem] bg-[var(--bg-elevated)]">
-                  {profile.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={profile.photoUrl}
-                      alt={profile.name}
-                      className="absolute inset-0 h-full w-full object-cover"
-                      fetchPriority="high"
-                      decoding="async"
-                      width={704}
-                      height={880}
-                    />
-                  ) : (
+              {profile.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.photoUrl}
+                  alt={profile.name}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  fetchPriority="high"
+                  decoding="async"
+                  width={704}
+                  height={880}
+                />
+              ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent-soft)] text-3xl font-semibold tracking-tight text-[var(--accent)]">
                     {profile.name

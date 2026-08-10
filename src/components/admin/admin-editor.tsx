@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  CheckCircle2,
+  CircleAlert,
   Eye,
   EyeOff,
   Plus,
@@ -11,6 +13,7 @@ import {
   Trash2,
   Upload,
   LogOut,
+  X,
 } from "lucide-react";
 import type {
   CertificationItem,
@@ -31,6 +34,16 @@ import { createId } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { cn } from "@/lib/utils";
+
+function isErrorStatus(message: string) {
+  return (
+    message.includes("fail") ||
+    message.includes("Invalid") ||
+    message.includes("not configured") ||
+    message.includes("Unauthorized") ||
+    message.includes("too large")
+  );
+}
 
 type Tab =
   | "profile"
@@ -74,7 +87,11 @@ export function AdminEditor({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  const dirtyHint = useMemo(() => status, [status]);
+  useEffect(() => {
+    if (!status || isErrorStatus(status)) return;
+    const timer = window.setTimeout(() => setStatus(""), 4200);
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   async function save() {
     setSaving(true);
@@ -90,7 +107,7 @@ export function AdminEditor({
         setStatus(data.error || "Save failed");
         return;
       }
-      setStatus("Saved successfully");
+      setStatus("Changes saved — public site is updated");
     } catch {
       setStatus("Save failed");
     } finally {
@@ -133,7 +150,7 @@ export function AdminEditor({
         logo: "Logo",
         favicon: "Favicon",
       };
-      setStatus(`${labels[kind]} saved to the public site`);
+      setStatus(`${labels[kind]} saved — live on the public site`);
     } catch {
       setStatus("Upload failed");
     } finally {
@@ -183,6 +200,8 @@ export function AdminEditor({
     });
   }
 
+  const statusIsError = status ? isErrorStatus(status) : false;
+
   return (
     <div className="min-h-[100svh] pb-16">
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--glass-strong)] backdrop-blur-xl">
@@ -219,6 +238,52 @@ export function AdminEditor({
         </div>
       </header>
 
+      {status && (
+        <div
+          className="pointer-events-none fixed inset-x-0 top-20 z-50 flex justify-center px-4"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className="pointer-events-auto glass-strong flex max-w-md items-start gap-3 rounded-2xl px-4 py-3 text-sm shadow-[var(--shadow)]"
+            style={
+              statusIsError
+                ? {
+                    borderColor:
+                      "color-mix(in srgb, var(--danger) 40%, var(--border))",
+                  }
+                : undefined
+            }
+          >
+            {statusIsError ? (
+              <CircleAlert
+                className="mt-0.5 h-5 w-5 shrink-0"
+                style={{ color: "var(--danger)" }}
+              />
+            ) : (
+              <CheckCircle2
+                className="mt-0.5 h-5 w-5 shrink-0"
+                style={{ color: "var(--success)" }}
+              />
+            )}
+            <p
+              className="min-w-0 flex-1 leading-snug"
+              style={{ color: statusIsError ? "var(--danger)" : "var(--fg)" }}
+            >
+              {status}
+            </p>
+            <button
+              type="button"
+              className="focus-ring -mr-1 rounded-full p-1 text-[var(--muted)] hover:text-[var(--fg)]"
+              aria-label="Dismiss"
+              onClick={() => setStatus("")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="container-page mt-6 grid gap-6 lg:grid-cols-[220px_1fr]">
         <aside className="glass h-fit rounded-2xl p-2 lg:sticky lg:top-24">
           <nav className="flex gap-1 overflow-x-auto lg:flex-col" aria-label="Admin sections">
@@ -241,19 +306,6 @@ export function AdminEditor({
         </aside>
 
         <div className="space-y-4">
-          {dirtyHint && (
-            <p
-              className="text-sm"
-              style={{
-                color: dirtyHint.includes("fail") || dirtyHint.includes("Invalid") || dirtyHint.includes("not configured")
-                  ? "var(--danger)"
-                  : "var(--success)",
-              }}
-            >
-              {dirtyHint}
-            </p>
-          )}
-
           {tab === "profile" && (
             <GlassCard className="space-y-4 p-5 sm:p-6">
               <Field
