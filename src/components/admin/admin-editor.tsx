@@ -22,6 +22,11 @@ import type {
   SkillCategory,
   SocialLink,
 } from "@/types/resume";
+import {
+  compressImageForUpload,
+  type CompressPreset,
+} from "@/lib/compress-image";
+import type { MediaKind } from "@/lib/media";
 import { createId } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -93,25 +98,76 @@ export function AdminEditor({
     }
   }
 
-  async function uploadPhoto(file: File) {
+  async function uploadMedia(kind: MediaKind, file: File) {
     setUploading(true);
     setStatus("");
     try {
+      const preset = kind as CompressPreset;
+      const compressed = await compressImageForUpload(file, preset);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", compressed);
+      form.append("kind", kind);
       const res = await fetch("/api/upload", { method: "POST", body: form });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !data.url) {
         setStatus(data.error || "Upload failed");
         return;
       }
-      setContent((prev) => ({
-        ...prev,
-        profile: { ...prev.profile, photoUrl: data.url! },
-      }));
-      setStatus("Photo uploaded — remember to save");
+      setContent((prev) => {
+        if (kind === "photo") {
+          return {
+            ...prev,
+            profile: { ...prev.profile, photoUrl: data.url! },
+          };
+        }
+        const field =
+          kind === "og" ? "ogImage" : kind === "logo" ? "logoUrl" : "faviconUrl";
+        return {
+          ...prev,
+          seo: { ...prev.seo, [field]: data.url! },
+        };
+      });
+      const labels: Record<MediaKind, string> = {
+        photo: "Photo",
+        og: "OG image",
+        logo: "Logo",
+        favicon: "Favicon",
+      };
+      setStatus(`${labels[kind]} saved to the public site`);
     } catch {
       setStatus("Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removeMedia(kind: MediaKind) {
+    setUploading(true);
+    setStatus("");
+    try {
+      const res = await fetch(`/api/upload?kind=${kind}`, { method: "DELETE" });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setStatus(data.error || "Remove failed");
+        return;
+      }
+      setContent((prev) => {
+        if (kind === "photo") {
+          return {
+            ...prev,
+            profile: { ...prev.profile, photoUrl: "" },
+          };
+        }
+        const field =
+          kind === "og" ? "ogImage" : kind === "logo" ? "logoUrl" : "faviconUrl";
+        return {
+          ...prev,
+          seo: { ...prev.seo, [field]: "" },
+        };
+      });
+      setStatus("Image removed");
+    } catch {
+      setStatus("Remove failed");
     } finally {
       setUploading(false);
     }
@@ -256,46 +312,14 @@ export function AdminEditor({
                   }
                 />
               </div>
-              <div>
-                <p className="mb-1.5 text-sm text-[var(--muted)]">Profile photo</p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="btn btn-ghost focus-ring cursor-pointer !py-2 text-sm">
-                    <Upload className="h-4 w-4" />
-                    {uploading ? "Uploading…" : "Upload image"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) void uploadPhoto(file);
-                      }}
-                    />
-                  </label>
-                  {content.profile.photoUrl && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost focus-ring !py-2 text-sm"
-                      onClick={() =>
-                        setContent((p) => ({
-                          ...p,
-                          profile: { ...p.profile, photoUrl: "" },
-                        }))
-                      }
-                    >
-                      Remove photo
-                    </button>
-                  )}
-                </div>
-                {content.profile.photoUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={content.profile.photoUrl}
-                    alt="Profile preview"
-                    className="mt-4 h-32 w-32 rounded-2xl object-cover"
-                  />
-                )}
-              </div>
+              <MediaUploadField
+                label="Profile photo"
+                url={content.profile.photoUrl}
+                uploading={uploading}
+                previewClassName="mt-4 h-32 w-32 rounded-2xl object-cover"
+                onUpload={(file) => void uploadMedia("photo", file)}
+                onRemove={() => void removeMedia("photo")}
+              />
             </GlassCard>
           )}
 
@@ -833,39 +857,115 @@ export function AdminEditor({
           )}
 
           {tab === "seo" && (
-            <GlassCard className="space-y-4 p-5 sm:p-6">
-              <Field
-                label="Title"
-                value={content.seo.title}
-                onChange={(v) =>
-                  setContent((p) => ({ ...p, seo: { ...p.seo, title: v } }))
-                }
-              />
-              <TextArea
-                label="Description"
-                value={content.seo.description}
-                onChange={(v) =>
-                  setContent((p) => ({
-                    ...p,
-                    seo: { ...p.seo, description: v },
-                  }))
-                }
-              />
-              <Field
-                label="Site URL"
-                value={content.seo.siteUrl}
-                onChange={(v) =>
-                  setContent((p) => ({ ...p, seo: { ...p.seo, siteUrl: v } }))
-                }
-              />
-              <Field
-                label="OG image path"
-                value={content.seo.ogImage}
-                onChange={(v) =>
-                  setContent((p) => ({ ...p, seo: { ...p.seo, ogImage: v } }))
-                }
-              />
-            </GlassCard>
+            <div className="space-y-4">
+              <GlassCard className="space-y-4 p-5 sm:p-6">
+                <h3 className="text-sm font-semibold tracking-wide text-[var(--muted)] uppercase">
+                  Meta
+                </h3>
+                <Field
+                  label="Title"
+                  value={content.seo.title}
+                  onChange={(v) =>
+                    setContent((p) => ({ ...p, seo: { ...p.seo, title: v } }))
+                  }
+                />
+                <TextArea
+                  label="Description"
+                  value={content.seo.description}
+                  onChange={(v) =>
+                    setContent((p) => ({
+                      ...p,
+                      seo: { ...p.seo, description: v },
+                    }))
+                  }
+                />
+                <Field
+                  label="Site URL"
+                  value={content.seo.siteUrl}
+                  onChange={(v) =>
+                    setContent((p) => ({ ...p, seo: { ...p.seo, siteUrl: v } }))
+                  }
+                />
+              </GlassCard>
+
+              <GlassCard className="space-y-4 p-5 sm:p-6">
+                <h3 className="text-sm font-semibold tracking-wide text-[var(--muted)] uppercase">
+                  Branding
+                </h3>
+                <MediaUploadField
+                  label="Logo"
+                  hint="Used for apple touch icon and brand identity."
+                  url={content.seo.logoUrl}
+                  uploading={uploading}
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  previewClassName="mt-4 h-20 w-20 rounded-xl object-contain bg-[var(--surface)] p-2"
+                  onUpload={(file) => void uploadMedia("logo", file)}
+                  onRemove={() => void removeMedia("logo")}
+                />
+                <MediaUploadField
+                  label="Favicon"
+                  hint="Browser tab icon. PNG or ICO, ideally 32×32 or 64×64."
+                  url={content.seo.faviconUrl}
+                  uploading={uploading}
+                  accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/jpeg,image/webp"
+                  previewClassName="mt-4 h-10 w-10 rounded object-contain bg-[var(--surface)] p-1"
+                  onUpload={(file) => void uploadMedia("favicon", file)}
+                  onRemove={() => void removeMedia("favicon")}
+                />
+              </GlassCard>
+
+              <GlassCard className="space-y-4 p-5 sm:p-6">
+                <h3 className="text-sm font-semibold tracking-wide text-[var(--muted)] uppercase">
+                  Open Graph
+                </h3>
+                <MediaUploadField
+                  label="OG image"
+                  hint="Recommended 1200×630. Shown when links are shared on social networks."
+                  url={content.seo.ogImage}
+                  uploading={uploading}
+                  previewClassName="mt-4 aspect-[1200/630] w-full max-w-md rounded-xl object-cover"
+                  onUpload={(file) => void uploadMedia("og", file)}
+                  onRemove={() => void removeMedia("og")}
+                />
+                <Field
+                  label="Or OG image URL"
+                  value={
+                    content.seo.ogImage.startsWith("/api/")
+                      ? ""
+                      : content.seo.ogImage
+                  }
+                  onChange={(v) =>
+                    setContent((p) => ({
+                      ...p,
+                      seo: { ...p.seo, ogImage: v },
+                    }))
+                  }
+                />
+              </GlassCard>
+
+              <GlassCard className="space-y-4 p-5 sm:p-6">
+                <h3 className="text-sm font-semibold tracking-wide text-[var(--muted)] uppercase">
+                  Google Search Console
+                </h3>
+                <p className="text-sm text-[var(--muted)]">
+                  In Search Console → Settings → Ownership verification → HTML
+                  tag, copy the content value from the meta tag and paste it
+                  below. Saving publishes{" "}
+                  <code className="text-xs">google-site-verification</code> on
+                  the site so Google can verify ownership.
+                </p>
+                <Field
+                  label="Verification code"
+                  value={content.seo.googleSiteVerification}
+                  onChange={(v) =>
+                    setContent((p) => ({
+                      ...p,
+                      seo: { ...p.seo, googleSiteVerification: v.trim() },
+                    }))
+                  }
+                />
+              </GlassCard>
+            </div>
           )}
         </div>
       </div>
@@ -891,6 +991,64 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
+  );
+}
+
+function MediaUploadField({
+  label,
+  hint,
+  url,
+  uploading,
+  accept = "image/*",
+  previewClassName,
+  onUpload,
+  onRemove,
+}: {
+  label: string;
+  hint?: string;
+  url: string;
+  uploading: boolean;
+  accept?: string;
+  previewClassName: string;
+  onUpload: (file: File) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-sm text-[var(--muted)]">{label}</p>
+      {hint && <p className="mb-2 text-xs text-[var(--muted)]">{hint}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="btn btn-ghost focus-ring cursor-pointer !py-2 text-sm">
+          <Upload className="h-4 w-4" />
+          {uploading ? "Uploading…" : "Upload image"}
+          <input
+            type="file"
+            accept={accept}
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {url && (
+          <button
+            type="button"
+            className="btn btn-ghost focus-ring !py-2 text-sm"
+            onClick={onRemove}
+            disabled={uploading}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={`${label} preview`} className={previewClassName} />
+      )}
+    </div>
   );
 }
 

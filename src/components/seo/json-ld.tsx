@@ -1,6 +1,12 @@
 import type { ResumeContent } from "@/types/resume";
 
 export function JsonLd({ content }: { content: ResumeContent }) {
+  const image =
+    content.seo.logoUrl ||
+    content.profile.photoUrl ||
+    content.seo.ogImage ||
+    undefined;
+
   const data = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -13,6 +19,7 @@ export function JsonLd({ content }: { content: ResumeContent }) {
       addressLocality: content.profile.location,
     },
     url: content.seo.siteUrl,
+    image: image || undefined,
     sameAs: content.socialLinks
       .map((l) => l.url)
       .filter((u) => u.startsWith("http")),

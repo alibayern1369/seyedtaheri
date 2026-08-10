@@ -1,6 +1,12 @@
+import { mkdir, readFile, writeFile } from "fs/promises";
+import path from "path";
 import { Redis } from "@upstash/redis";
 import { defaultResumeContent } from "@/data/default-resume";
+import { getMedia, mediaPublicUrl, type MediaKind } from "@/lib/media";
 import { RESUME_CONTENT_KEY, type ResumeContent } from "@/types/resume";
+
+const LOCAL_DATA_DIR = path.join(process.cwd(), ".data");
+const LOCAL_CONTENT_PATH = path.join(LOCAL_DATA_DIR, "content.json");
 
 function hasRedisEnv() {
   return Boolean(
@@ -13,26 +19,129 @@ function getRedis() {
   return Redis.fromEnv();
 }
 
+async function readLocalContent(): Promise<ResumeContent | null> {
+  try {
+    const raw = await readFile(LOCAL_CONTENT_PATH, "utf8");
+    return JSON.parse(raw) as ResumeContent;
+  } catch {
+    return null;
+  }
+}
+
+async function writeLocalContent(content: ResumeContent): Promise<void> {
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_CONTENT_PATH, JSON.stringify(content), "utf8");
+}
+
+function isManagedMediaUrl(url: string, kind: MediaKind) {
+  if (kind === "photo") {
+    return (
+      url.startsWith("/api/media/photo") ||
+      url.startsWith("/api/photo") ||
+      url.startsWith("data:")
+    );
+  }
+  return url.startsWith(`/api/media/${kind}`) || url.startsWith("data:");
+}
+
+async function resolveMediaUrl(
+  current: string,
+  kind: MediaKind,
+): Promise<string> {
+  const stored = await getMedia(kind);
+  if (!stored) return current;
+  if (isManagedMediaUrl(current, kind) && !current.startsWith("data:")) {
+    // Normalize legacy photo path
+    if (kind === "photo" && current.startsWith("/api/photo")) {
+      return mediaPublicUrl("photo");
+    }
+    return current;
+  }
+  return mediaPublicUrl(kind);
+}
+
+async function withStoredMedia(content: ResumeContent): Promise<ResumeContent> {
+  const [photoUrl, ogImage, logoUrl, faviconUrl] = await Promise.all([
+    resolveMediaUrl(content.profile.photoUrl, "photo"),
+    resolveMediaUrl(content.seo.ogImage, "og"),
+    resolveMediaUrl(content.seo.logoUrl, "logo"),
+    resolveMediaUrl(content.seo.faviconUrl, "favicon"),
+  ]);
+
+  if (
+    photoUrl === content.profile.photoUrl &&
+    ogImage === content.seo.ogImage &&
+    logoUrl === content.seo.logoUrl &&
+    faviconUrl === content.seo.faviconUrl
+  ) {
+    return content;
+  }
+
+  return {
+    ...content,
+    profile: { ...content.profile, photoUrl },
+    seo: { ...content.seo, ogImage, logoUrl, faviconUrl },
+  };
+}
+
 export async function getResumeContent(): Promise<ResumeContent> {
   try {
     const redis = getRedis();
-    if (!redis) return defaultResumeContent;
-    const stored = await redis.get<ResumeContent>(RESUME_CONTENT_KEY);
-    if (!stored) return defaultResumeContent;
-    return mergeWithDefaults(stored);
+    if (redis) {
+      const stored = await redis.get<ResumeContent>(RESUME_CONTENT_KEY);
+      if (!stored) {
+        return withStoredMedia(defaultResumeContent);
+      }
+      return withStoredMedia(mergeWithDefaults(stored));
+    }
+
+    const local = await readLocalContent();
+    if (!local) {
+      return withStoredMedia(defaultResumeContent);
+    }
+    return withStoredMedia(mergeWithDefaults(local));
   } catch {
     return defaultResumeContent;
   }
 }
 
 export async function saveResumeContent(content: ResumeContent): Promise<void> {
+  // Keep content JSON small: data URLs belong in the dedicated media store.
+  const toStore: ResumeContent = {
+    ...content,
+    profile: {
+      ...content.profile,
+      photoUrl: content.profile.photoUrl.startsWith("data:")
+        ? mediaPublicUrl("photo")
+        : content.profile.photoUrl,
+    },
+    seo: {
+      ...content.seo,
+      ogImage: content.seo.ogImage.startsWith("data:")
+        ? mediaPublicUrl("og")
+        : content.seo.ogImage,
+      logoUrl: content.seo.logoUrl.startsWith("data:")
+        ? mediaPublicUrl("logo")
+        : content.seo.logoUrl,
+      faviconUrl: content.seo.faviconUrl.startsWith("data:")
+        ? mediaPublicUrl("favicon")
+        : content.seo.faviconUrl,
+    },
+  };
+
   const redis = getRedis();
-  if (!redis) {
+  if (redis) {
+    await redis.set(RESUME_CONTENT_KEY, toStore);
+    return;
+  }
+
+  if (process.env.VERCEL) {
     throw new Error(
       "Redis is not configured. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.",
     );
   }
-  await redis.set(RESUME_CONTENT_KEY, content);
+
+  await writeLocalContent(toStore);
 }
 
 function mergeWithDefaults(stored: ResumeContent): ResumeContent {

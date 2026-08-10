@@ -63,7 +63,11 @@ export function HeroSection({ content }: { content: ResumeContent }) {
                   priority
                   className="object-cover"
                   sizes="(max-width: 768px) 80vw, 352px"
-                  unoptimized={profile.photoUrl.startsWith("data:")}
+                  unoptimized={
+                    profile.photoUrl.startsWith("data:") ||
+                    profile.photoUrl.startsWith("/api/photo") ||
+                    profile.photoUrl.startsWith("/api/media/")
+                  }
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">

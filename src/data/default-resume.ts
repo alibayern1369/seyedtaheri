@@ -421,7 +421,10 @@ export const defaultResumeContent: ResumeContent = {
     title: "Seyed Taheri — DevSecOps Engineer",
     description:
       "DevSecOps Engineer in Espoo, Finland specializing in CI/CD security, cloud hardening, vulnerability management, and agentic AI pipelines.",
-    ogImage: "/og.png",
+    ogImage: "",
     siteUrl: "https://seyedtaheri.vercel.app",
+    logoUrl: "",
+    faviconUrl: "",
+    googleSiteVerification: "",
   },
 };

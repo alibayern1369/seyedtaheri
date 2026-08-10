@@ -124,8 +124,15 @@ export interface ResumeContent {
     description: string;
     ogImage: string;
     siteUrl: string;
+    logoUrl: string;
+    faviconUrl: string;
+    googleSiteVerification: string;
   };
 }
 
 export const RESUME_CONTENT_KEY = "resume:content";
+export const RESUME_PHOTO_KEY = "resume:photo";
+export const RESUME_OG_KEY = "resume:media:og";
+export const RESUME_LOGO_KEY = "resume:media:logo";
+export const RESUME_FAVICON_KEY = "resume:media:favicon";
 export const RESUME_CONTENT_VERSION = 1;
